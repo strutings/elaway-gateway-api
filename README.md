@@ -18,4 +18,4 @@ Elaway Charge API is a Node.js application that interacts with the Elaway chargi
 
 The recommended way would be to use docker. Copy the docker-compose.yml.example and fill in your information.
 
-For legal reasons the client secrets are not provided here, but can be aquired with [mitmproxy](https://www.google.com/search?q=mitmporxy).
+For legal reasons the client secrets are not provided here, but can be aquired using and iPhone/Android device with the Elaway app, in combination with [mitmproxy](https://mitmproxy.org/).
