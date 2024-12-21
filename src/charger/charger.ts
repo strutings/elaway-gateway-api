@@ -1,10 +1,13 @@
 import axios from "axios";
 
+const pollingInterval = Number(process.env.POLLING_INTERVAL) || 60000;
+
 class Charger {
   private static instance: Charger;
   chargerId: string;
   evseId: number;
   activeSessionId?: number;
+  private intervalId?: NodeJS.Timeout;
 
   private constructor(chargerId: string, evseId: number, activeSessionId?: number) {
     this.chargerId = chargerId;
@@ -22,6 +25,41 @@ class Charger {
       Charger.instance = new Charger(chargePointData.id, chargePointData.evses[0].id, chargePointData.evses[0].session?.id);
     }
     return Charger.instance;
+  }
+
+  public async checkSessionStatus() {
+    try {
+      const response = await axios.get(`https://no.eu-elaway.charge.ampeco.tech/api/v1/app/personal/charge-points/${this.chargerId}`);
+      const currentSessionId = response?.data?.data?.evses[0]?.session?.id;
+
+      if (this.activeSessionId && !currentSessionId) {
+        console.log('Charging session stopped externally');
+        this.activeSessionId = undefined;
+      } else if (!this.activeSessionId && currentSessionId) {
+        console.log('Charging session started externally');
+        this.activeSessionId = currentSessionId;
+      }
+    } catch (error) {
+      console.error('Error during session status check:', error);
+    }
+  }
+
+  startPeriodicCheck() {
+    // Utfør en umiddelbar sjekk ved oppstart
+    this.checkSessionStatus();
+
+    // Sett opp et intervall for periodiske sjekker
+    this.intervalId = setInterval(async () => {
+      await this.checkSessionStatus();
+    }, pollingInterval); // Sjekk hvert minutt (60000 ms)
+  }
+
+  public stopPeriodicCheck() {
+    if (this.intervalId) {
+      clearInterval(this.intervalId);
+      this.intervalId = undefined;
+      console.log('Periodic check stopped');
+    }
   }
 
   public async get() {
