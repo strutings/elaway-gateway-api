@@ -151,7 +151,7 @@ async function startOauth(): Promise<ElawayTokenResponse | null> {
   let accessIdResponse: null | IdTokenResponse = null;
   const authUrl = `${elawayAuthorizationUrl}?response_type=code&client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(oauthScope)}&state=${encodeURIComponent(state)}`;
 
-  const browser = await puppeteer.launch({ headless: true });
+  const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox'] });
   const page = await browser.newPage();
 
   try {
