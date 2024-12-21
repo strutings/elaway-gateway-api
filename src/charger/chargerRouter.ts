@@ -9,12 +9,21 @@ router.get("/", async (_req, res) => {
 
 router.post("/start", async (_req, res) => {
   const charger = await Charger.getInstance();
-  res.send(await charger.startCharging());
+
+  try {
+    res.send(await charger.startCharging());
+  } catch (error) {
+    res.status(400).send(error.message);
+  }
 });
 
 router.post("/stop", async (_req, res) => {
   const charger = await Charger.getInstance();
-  res.send(await charger.stopCharging());
+  try {
+    res.send(await charger.stopCharging());
+  } catch (error) {
+    res.status(400).send(error.message);
+  }
 });
 
 export default router;

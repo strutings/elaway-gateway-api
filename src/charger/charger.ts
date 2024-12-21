@@ -33,16 +33,21 @@ class Charger {
     const response = await axios.post('https://no.eu-elaway.charge.ampeco.tech/api/v1/app/session/start', {
       evseId: this.evseId
     });
-    this.activeSessionId = response.data.data.id;
+    this.activeSessionId = response.data.session.id;
 
-    return response
+    return response.data.session
   }
 
   public async stopCharging() {
-    const response = await axios.post(`https://no.eu-elaway.charge.ampeco.tech/api/v1/app/session/${this.activeSessionId}/end`, {
-      evseId: this.evseId
-    });
-    return response
+    const charger = await axios.get('https://no.eu-elaway.charge.ampeco.tech/api/v1/app/personal/charge-points');
+    const currentSessionId = charger?.data?.data[0]?.evses[0]?.session?.id
+
+    if (!currentSessionId) {
+      throw new Error('No active session');
+    }
+
+    const response = await axios.post(`https://no.eu-elaway.charge.ampeco.tech/api/v1/app/session/${currentSessionId}/end`);
+    return response.data.data
   }
 }
 
