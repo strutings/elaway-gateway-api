@@ -1,0 +1,26 @@
+name: Build and Push Docker Image
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment: prod
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Build Docker Image
+        working-directory: ./
+        run: |
+          docker build -t jvik/elaway-gateway-api:latest .
+
+      - name: Log in to Docker Hub
+        run: docker login -u jvik -p ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Push Docker Image
+        run: docker push jvik/elaway-gateway-api:latest
