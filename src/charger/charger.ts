@@ -4,11 +4,12 @@ class Charger {
   private static instance: Charger;
   chargerId: string;
   evseId: number;
-  activeSessionId?: string;
+  activeSessionId?: number;
 
-  private constructor(chargerId: string, evseId: number) {
+  private constructor(chargerId: string, evseId: number, activeSessionId?: number) {
     this.chargerId = chargerId;
     this.evseId = evseId;
+    this.activeSessionId = activeSessionId;
   }
 
   static async getInstance(): Promise<Charger> {
@@ -18,7 +19,7 @@ class Charger {
       const chargerData = response.data.data[0];
 
       const chargePointData = chargerData;
-      Charger.instance = new Charger(chargePointData.id, chargePointData.evses[0].id);
+      Charger.instance = new Charger(chargePointData.id, chargePointData.evses[0].id, chargePointData.evses[0].session?.id);
     }
     return Charger.instance;
   }
