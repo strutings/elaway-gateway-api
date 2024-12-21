@@ -11,13 +11,6 @@ const token = await getValidCredentials();
 
 axios.interceptors.request.use(async (config) => {
 
-dotenv.config();
-
-const port = process.env.PORT || 3000;
-const app = express();
-
-axios.interceptors.request.use(async (config) => {
-  const token = await getValidCredentials();
   config.headers.Authorization = `Bearer ${token?.access_token}`;
 
   return config;
