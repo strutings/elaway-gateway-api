@@ -7,7 +7,6 @@ class Charger {
   chargerId: string;
   evseId: number;
   activeSessionId?: number;
-  private intervalId?: NodeJS.Timeout;
 
   private constructor(chargerId: string, evseId: number, activeSessionId?: number) {
     this.chargerId = chargerId;
@@ -49,17 +48,9 @@ class Charger {
     this.checkSessionStatus();
 
     // Sett opp et intervall for periodiske sjekker
-    this.intervalId = setInterval(async () => {
+    setInterval(async () => {
       await this.checkSessionStatus();
     }, pollingInterval); // Sjekk hvert minutt (60000 ms)
-  }
-
-  public stopPeriodicCheck() {
-    if (this.intervalId) {
-      clearInterval(this.intervalId);
-      this.intervalId = undefined;
-      console.log('Periodic check stopped');
-    }
   }
 
   public async get() {
