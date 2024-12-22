@@ -17,6 +17,13 @@ axios.interceptors.request.use(async (config) => {
   return config;
 });
 
+const chargerData = (await axios.get(`${config.ampecoApiUrl}/personal/charge-points`)).data.data[0];
+
+const chargerInfo = {
+  chargerId: chargerData.id,
+  evseId: chargerData.evses[0].id
+}
+
 app.use(express.json());
 
 app.use("/charger", chargerRouter);
@@ -24,3 +31,5 @@ app.use("/charger", chargerRouter);
 app.listen(port, () => {
   console.info(`Server is running on http://localhost:${port}`);
 });
+
+export { chargerInfo };
