@@ -3,7 +3,6 @@ import express from 'express';
 import chargerRouter from './charger/chargerRouter.js';
 import axios from 'axios';
 import { getValidCredentials } from './auth.js';
-import Charger from './charger/charger.js';
 
 const port = config.port;
 const app = express();
@@ -17,9 +16,6 @@ axios.interceptors.request.use(async (config) => {
   config.headers.Authorization = `Bearer ${token?.access_token}`;
   return config;
 });
-
-const charger = await Charger.getInstance();
-charger.startPeriodicCheck();
 
 app.use(express.json());
 

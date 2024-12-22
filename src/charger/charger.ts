@@ -5,12 +5,10 @@ class Charger {
   private static instance: Charger;
   chargerId: string;
   evseId: number;
-  activeSessionId?: number;
 
-  private constructor(chargerId: string, evseId: number, activeSessionId?: number) {
+  private constructor(chargerId: string, evseId: number) {
     this.chargerId = chargerId;
     this.evseId = evseId;
-    this.activeSessionId = activeSessionId;
   }
 
   static async getInstance(): Promise<Charger> {
@@ -20,39 +18,33 @@ class Charger {
       const chargerData = response.data.data[0];
 
       const chargePointData = chargerData;
-      Charger.instance = new Charger(chargePointData.id, chargePointData.evses[0].id, chargePointData.evses[0].session?.id);
+      Charger.instance = new Charger(chargePointData.id, chargePointData.evses[0].id);
     }
     return Charger.instance;
   }
 
-  public async checkSessionStatus() {
+  public async checkSessionStatus(): Promise<number | undefined> {
     try {
       const response = await axios.get(`${config.ampecoApiUrl}/personal/charge-points/${this.chargerId}`);
       const currentSessionId = response?.data?.data?.evses[0]?.session?.id;
+      return currentSessionId;
 
-      if (this.activeSessionId && !currentSessionId) {
-        console.info('Charging session stopped externally');
-        this.activeSessionId = undefined;
-      } else if (!this.activeSessionId && currentSessionId) {
-        console.info('Charging session started externally');
-        this.activeSessionId = currentSessionId;
-      }
     } catch (error) {
       console.error('Error during session status check:', error);
     }
+
+    return undefined;
   }
 
   startPeriodicCheck() {
-    // Utfør en umiddelbar sjekk ved oppstart
     this.checkSessionStatus();
 
-    // Sett opp et intervall for periodiske sjekker
     setInterval(async () => {
       await this.checkSessionStatus();
     }, config.pollingInterval); // Sjekk hvert minutt (60000 ms)
   }
 
-  public async get() {
+  public async getChargerInfo() {
     const response = await axios.get(`${config.ampecoApiUrl}/personal/charge-points/${this.chargerId}`);
 
     return response.data;
@@ -62,7 +54,6 @@ class Charger {
     const response = await axios.post(`${config.ampecoApiUrl}/session/start`, {
       evseId: this.evseId
     });
-    this.activeSessionId = response.data.session.id;
 
     return response.data.session
   }
@@ -77,7 +68,6 @@ class Charger {
 
     try {
       const response = await axios.post(`${config.ampecoApiUrl}/session/${currentSessionId}/end`);
-      this.activeSessionId = undefined;
       return response.data.data
     } catch (error) {
       throw new Error(`Failed to stop charging. ${error.message}`);

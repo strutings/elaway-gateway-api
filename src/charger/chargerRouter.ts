@@ -4,7 +4,10 @@ import Charger from "./charger.js";
 const router = express.Router();
 
 router.get("/", async (_req, res) => {
-  res.send(await Charger.getInstance())
+  const charger = await Charger.getInstance()
+  const chargerinfo = await charger.getChargerInfo()
+
+  res.send(chargerinfo)
 });
 
 router.post("/start", async (_req, res) => {
