@@ -7,19 +7,16 @@ import Charger from './charger/charger.js';
 
 const port = config.port;
 const app = express();
-
 const token = await getValidCredentials();
-
-axios.interceptors.request.use(async (config) => {
-
-  config.headers.Authorization = `Bearer ${token?.access_token}`;
-
-  return config;
-});
 
 if (!token) {
   throw new Error('Could not get valid credentials');
 }
+
+axios.interceptors.request.use(async (config) => {
+  config.headers.Authorization = `Bearer ${token?.access_token}`;
+  return config;
+});
 
 const charger = await Charger.getInstance();
 charger.startPeriodicCheck();
@@ -29,5 +26,5 @@ app.use(express.json());
 app.use("/charger", chargerRouter);
 
 app.listen(port, () => {
-  console.log(`Server is running on http://localhost:${port}`);
+  console.info(`Server is running on http://localhost:${port}`);
 });

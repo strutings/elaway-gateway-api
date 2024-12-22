@@ -32,10 +32,10 @@ class Charger {
       const currentSessionId = response?.data?.data?.evses[0]?.session?.id;
 
       if (this.activeSessionId && !currentSessionId) {
-        console.log('Charging session stopped externally');
+        console.info('Charging session stopped externally');
         this.activeSessionId = undefined;
       } else if (!this.activeSessionId && currentSessionId) {
-        console.log('Charging session started externally');
+        console.info('Charging session started externally');
         this.activeSessionId = currentSessionId;
       }
     } catch (error) {

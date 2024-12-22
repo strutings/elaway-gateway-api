@@ -135,7 +135,7 @@ function saveTokens(tokenResponse: ElawayTokenResponse): StoredElawayToken {
   };
   fs.writeFileSync(tokenFilePath, JSON.stringify(storedToken));
 
-  console.log("New bearer token saved");
+  console.info("New bearer token saved");
 
   return storedToken;
 }
@@ -178,7 +178,7 @@ async function startOauth(): Promise<ElawayTokenResponse | null> {
 
     const code = await getAuthorizationCode(page);
     if (code) {
-      console.log("Found authorization code:");
+      console.error("Found authorization code:");
       await browser.close();
 
       accessIdResponse = await exchangeCodeForIdAndAuthToken(code);
@@ -212,7 +212,7 @@ async function getValidCredentials(): Promise<StoredElawayToken | null> {
   // }
 
   if (!validBearerToken) {
-    console.log("No existing bearer token found. Attempting to get new token.");
+    console.info("No existing bearer token found. Attempting to get new token.");
     const newToken = await startOauth();
 
     if (!newToken) {
@@ -221,7 +221,7 @@ async function getValidCredentials(): Promise<StoredElawayToken | null> {
     return loadTokens();
   }
 
-  console.log("Using stored bearer token");
+  console.info("Using stored bearer token");
 
   return storedToken;
 }
