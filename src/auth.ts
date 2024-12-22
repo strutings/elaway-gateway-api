@@ -12,7 +12,7 @@ const oauthScope = "openid profile email";
 const state = "randomstate";
 const redirectUri = "io.elaway.no.app://auth.elaway.io/ios/io.elaway.no.app/callback";
 const elawayAuthorizationUrl = "https://auth.elaway.io/authorize";
-const ampecoApiUrl = "https://no.eu-elaway.charge.ampeco.tech/api/v1/app/oauth/token";
+const ampecoApiUrl = `${config.ampecoApiUrl}/oauth/token`;
 const elawayTokenUrl = "https://auth.elaway.io/oauth/token";
 const tokenFilePath = path.resolve(__dirname, 'tokens.json');
 

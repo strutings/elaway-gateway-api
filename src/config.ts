@@ -11,7 +11,8 @@ const envVarsSchema = Joi.object({
   ELAWAY_CLIENT_SECRET: Joi.string().required(),
   ELAWAY_PASSWORD: Joi.string().required(),
   POLLING_INTERVAL: Joi.number().default(60000),
-  CLIENT_ID: Joi.string().required()
+  CLIENT_ID: Joi.string().required(),
+  AMPECO_API_URL: Joi.string().uri().default("https://no.eu-elaway.charge.ampeco.tech/api/v1/app")
 }).unknown();
 
 // Validate environment variables
@@ -32,6 +33,7 @@ const config = {
   elawayClientSecret: envVars.ELAWAY_CLIENT_SECRET,
   pollingInterval: envVars.POLLING_INTERVAL,
   clientId: envVars.CLIENT_ID,
+  ampecoApiUrl: envVars.AMPECO_API_URL
 };
 
 export default config;

@@ -1,6 +1,5 @@
 import axios from "axios";
-
-const pollingInterval = Number(process.env.POLLING_INTERVAL) || 60000;
+import config from "../config.js";
 
 class Charger {
   private static instance: Charger;
@@ -16,7 +15,7 @@ class Charger {
 
   static async getInstance(): Promise<Charger> {
     if (!Charger.instance) {
-      const response = await axios.get("https://no.eu-elaway.charge.ampeco.tech/api/v1/app/personal/charge-points");
+      const response = await axios.get(`${config.ampecoApiUrl}/personal/charge-points`);
 
       const chargerData = response.data.data[0];
 
@@ -28,7 +27,7 @@ class Charger {
 
   public async checkSessionStatus() {
     try {
-      const response = await axios.get(`https://no.eu-elaway.charge.ampeco.tech/api/v1/app/personal/charge-points/${this.chargerId}`);
+      const response = await axios.get(`${config.ampecoApiUrl}/personal/charge-points/${this.chargerId}`);
       const currentSessionId = response?.data?.data?.evses[0]?.session?.id;
 
       if (this.activeSessionId && !currentSessionId) {
@@ -50,17 +49,17 @@ class Charger {
     // Sett opp et intervall for periodiske sjekker
     setInterval(async () => {
       await this.checkSessionStatus();
-    }, pollingInterval); // Sjekk hvert minutt (60000 ms)
+    }, config.pollingInterval); // Sjekk hvert minutt (60000 ms)
   }
 
   public async get() {
-    const response = await axios.get(`https://no.eu-elaway.charge.ampeco.tech/api/v1/app/personal/charge-points/${this.chargerId}`);
+    const response = await axios.get(`${config.ampecoApiUrl}/personal/charge-points/${this.chargerId}`);
 
     return response.data;
   }
 
   public async startCharging() {
-    const response = await axios.post('https://no.eu-elaway.charge.ampeco.tech/api/v1/app/session/start', {
+    const response = await axios.post(`${config.ampecoApiUrl}/session/start`, {
       evseId: this.evseId
     });
     this.activeSessionId = response.data.session.id;
@@ -69,7 +68,7 @@ class Charger {
   }
 
   public async stopCharging() {
-    const charger = await axios.get('https://no.eu-elaway.charge.ampeco.tech/api/v1/app/personal/charge-points');
+    const charger = await axios.get(`${config.ampecoApiUrl}/personal/charge-points`);
     const currentSessionId = charger?.data?.data[0]?.evses[0]?.session?.id
 
     if (!currentSessionId) {
@@ -77,7 +76,7 @@ class Charger {
     }
 
     try {
-      const response = await axios.post(`https://no.eu-elaway.charge.ampeco.tech/api/v1/app/session/${currentSessionId}/end`);
+      const response = await axios.post(`${config.ampecoApiUrl}/session/${currentSessionId}/end`);
       this.activeSessionId = undefined;
       return response.data.data
     } catch (error) {
