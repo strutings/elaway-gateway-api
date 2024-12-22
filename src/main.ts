@@ -1,11 +1,11 @@
-import 'dotenv/config';
+import config from './config.js';
 import express from 'express';
 import chargerRouter from './charger/chargerRouter.js';
 import axios from 'axios';
 import { getValidCredentials } from './auth.js';
 import Charger from './charger/charger.js';
 
-const port = process.env.PORT || 3000;
+const port = config.port;
 const app = express();
 
 const token = await getValidCredentials();
@@ -16,6 +16,10 @@ axios.interceptors.request.use(async (config) => {
 
   return config;
 });
+
+if (!token) {
+  throw new Error('Could not get valid credentials');
+}
 
 const charger = await Charger.getInstance();
 charger.startPeriodicCheck();

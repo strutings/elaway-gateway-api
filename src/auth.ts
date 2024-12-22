@@ -1,3 +1,4 @@
+import config from './config.js';
 import puppeteer, { type Page } from 'puppeteer';
 import axios from 'axios';
 import fs from 'node:fs';
@@ -7,17 +8,12 @@ import { fileURLToPath } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const clientId = process.env.CLIENT_ID || '';
-const redirectUri = process.env.REDIRECT_URI || 'io.elaway.no.app://auth.elaway.io/ios/io.elaway.no.app/callback';
 const oauthScope = "openid profile email";
 const state = "randomstate";
+const redirectUri = "io.elaway.no.app://auth.elaway.io/ios/io.elaway.no.app/callback";
 const elawayAuthorizationUrl = "https://auth.elaway.io/authorize";
 const ampecoApiUrl = "https://no.eu-elaway.charge.ampeco.tech/api/v1/app/oauth/token";
 const elawayTokenUrl = "https://auth.elaway.io/oauth/token";
-const elawayClientId = process.env.ELAWAY_CLIENT_ID || '1';
-const elawayClientSecret = process.env.ELAWAY_CLIENT_SECRET || '';
-const elawayUser = process.env.ELAWAY_USER || '';
-const elawayPassword = process.env.ELAWAY_PASSWORD || '';
 const tokenFilePath = path.resolve(__dirname, 'tokens.json');
 
 interface IdTokenResponse {
@@ -67,7 +63,7 @@ async function getAuthorizationCode(page: Page): Promise<string | null> {
 async function exchangeCodeForIdAndAuthToken(code: string): Promise<IdTokenResponse> {
   const response = await axios.post(elawayTokenUrl, {
     grant_type: "authorization_code",
-    client_id: clientId,
+    client_id: config.clientId,
     redirect_uri: redirectUri,
     code: code
   }, {
@@ -98,29 +94,34 @@ async function exchangeCodeForIdAndAuthToken(code: string): Promise<IdTokenRespo
 // return response.data;
 // }
 
-async function getElawayToken(accessToken: string, idToken: string): Promise<ElawayTokenResponse> {
-  const response = await axios.post(ampecoApiUrl, {
-    token: JSON.stringify({
-      accessToken: accessToken,
-      idToken: idToken,
-      scope: "openid profile email",
-      expiresIn: 100,
-      tokenType: "Bearer"
-    }),
-    type: "auth0",
-    grant_type: "third-party",
-    client_id: elawayClientId,
-    client_secret: elawayClientSecret
-  }, {
-    headers: {
-      "Content-Type": "application/json",
-      "User-Agent": "insomnia/10.0.0"
-    }
-  });
+async function getElawayToken(accessToken: string, idToken: string): Promise<ElawayTokenResponse | null> {
+  try {
+    const response = await axios.post(ampecoApiUrl, {
+      token: JSON.stringify({
+        accessToken: accessToken,
+        idToken: idToken,
+        scope: "openid profile email",
+        expiresIn: 100,
+        tokenType: "Bearer"
+      }),
+      type: "auth0",
+      grant_type: "third-party",
+      client_id: config.elawayClientId,
+      client_secret: config.elawayClientSecret
+    }, {
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent": "insomnia/10.0.0"
+      }
+    });
 
-  saveTokens(response.data);
+    saveTokens(response.data);
 
-  return response.data;
+    return response.data;
+  } catch (error) {
+    console.error(error.message);
+    return null;
+  }
 }
 
 function saveTokens(tokenResponse: ElawayTokenResponse): StoredElawayToken {
@@ -133,6 +134,8 @@ function saveTokens(tokenResponse: ElawayTokenResponse): StoredElawayToken {
     expires_at: expiresAt
   };
   fs.writeFileSync(tokenFilePath, JSON.stringify(storedToken));
+
+  console.log("New bearer token saved");
 
   return storedToken;
 }
@@ -149,31 +152,41 @@ function loadTokens(): StoredElawayToken | null {
 async function startOauth(): Promise<ElawayTokenResponse | null> {
   let tokenResponse: ElawayTokenResponse | null = null;
   let accessIdResponse: null | IdTokenResponse = null;
-  const authUrl = `${elawayAuthorizationUrl}?response_type=code&client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(oauthScope)}&state=${encodeURIComponent(state)}`;
+  const authUrl = `${elawayAuthorizationUrl}?response_type=code&client_id=${encodeURIComponent(config.clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(oauthScope)}&state=${encodeURIComponent(state)}`;
 
   const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox'] });
   const page = await browser.newPage();
 
   try {
-    await page.goto(authUrl);
+    await page.goto(authUrl, { waitUntil: 'domcontentloaded', timeout: 10000 });
+
+    const errorMessage = await page.evaluate(() => {
+      const errorElement = document.querySelector('p.error-message');
+      return errorElement ? (errorElement as HTMLElement).innerText : null;
+    });
+
+    if (errorMessage) {
+      console.error("Error on login page:", errorMessage);
+      throw new Error("Error during login. You most likely have the wrong CLIENT_ID")
+    }
+
     await page.waitForSelector('input[name="username"]');
     await page.waitForSelector('input[name="password"]');
-    await page.type('input[name="username"]', elawayUser, { delay: 50 });
-    await page.type('input[name="password"]', elawayPassword, { delay: 50 });
+    await page.type('input[name="username"]', config.elawayUser, { delay: 50 });
+    await page.type('input[name="password"]', config.elawayPassword, { delay: 50 });
     await page.keyboard.press('Enter');
 
     const code = await getAuthorizationCode(page);
     if (code) {
-      console.log("Fann autorisasjonskode:", code);
+      console.log("Found authorization code:");
       await browser.close();
 
       accessIdResponse = await exchangeCodeForIdAndAuthToken(code);
 
       tokenResponse = await getElawayToken(accessIdResponse.access_token, accessIdResponse.id_token);
-
     }
   } catch (error) {
-    console.error("Feil ved handtering:", error);
+    console.error(error.message);
   } finally {
     await browser.close();
   }
@@ -199,11 +212,16 @@ async function getValidCredentials(): Promise<StoredElawayToken | null> {
   // }
 
   if (!validBearerToken) {
+    console.log("No existing bearer token found. Attempting to get new token.");
     const newToken = await startOauth();
-    if (newToken) {
-      return loadTokens();
+
+    if (!newToken) {
+      throw new Error("Could not get valid credentials");
     }
+    return loadTokens();
   }
+
+  console.log("Using stored bearer token");
 
   return storedToken;
 }
