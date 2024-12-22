@@ -72,6 +72,10 @@ async function exchangeCodeForIdAndAuthToken(code: string): Promise<IdTokenRespo
     }
   });
 
+  if (response.status !== 200) {
+    console.error("Error during token exchange:", response.data);
+  }
+
   return response.data;
 }
 
@@ -178,7 +182,7 @@ async function startOauth(): Promise<ElawayTokenResponse | null> {
 
     const code = await getAuthorizationCode(page);
     if (code) {
-      console.error("Found authorization code:");
+      console.info("Found authorization code.");
       await browser.close();
 
       accessIdResponse = await exchangeCodeForIdAndAuthToken(code);
