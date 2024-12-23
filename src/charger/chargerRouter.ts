@@ -1,7 +1,7 @@
 import express from "express";
 import axios from "axios";
 import config from "../config.js";
-import { chargerInfo } from "../main.js";
+import { chargerInfo } from "./charger.js";
 
 const router = express.Router();
 
