@@ -37,6 +37,7 @@ interface StoredElawayToken {
 }
 
 async function getAuthorizationCode(page: Page): Promise<string | null> {
+  console.info("Waiting for authorization code from redirect.");
   return new Promise((resolve, reject) => {
     page.on('response', async (response) => {
       try {
@@ -54,6 +55,7 @@ async function getAuthorizationCode(page: Page): Promise<string | null> {
           }
         }
       } catch (error) {
+        console.error("Error in getAuthorizationCode:", error.message);
         reject(error);
       }
     });
@@ -61,6 +63,7 @@ async function getAuthorizationCode(page: Page): Promise<string | null> {
 }
 
 async function exchangeCodeForIdAndAuthToken(code: string): Promise<IdTokenResponse> {
+  console.info("Exchanging authorization code for access token and ID token.");
   const response = await axios.post(elawayTokenUrl, {
     grant_type: "authorization_code",
     client_id: config.clientId,
@@ -164,6 +167,8 @@ async function startOauth(): Promise<ElawayTokenResponse> {
   let accessIdResponse: null | IdTokenResponse = null;
   const authUrl = `${elawayAuthorizationUrl}?response_type=code&client_id=${encodeURIComponent(config.clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(oauthScope)}&state=${encodeURIComponent(state)}`;
 
+  console.info("No valid bearer token found. Starting OAuth flow.");
+
   const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox'] });
   const page = await browser.newPage();
 
@@ -211,31 +216,15 @@ async function getValidCredentials(): Promise<StoredElawayToken> {
 
   const validBearerToken = storedToken && storedToken.expires_at > Date.now();
 
-  // Sjekk om token går ut om mindre enn 5 minutter
-  // Forleng tokenet
+  // TODO: Implement refresh token
 
-  // const refreshedToken = await refreshAccessToken(storedToken.refresh_token);
-
-
-  // if (storedToken && storedToken.expires_at - Date.now() < 5 * 60 * 1000) {
-  //   const refreshedToken = await refreshAccessToken(storedToken.refresh_token);
-  //   if (refreshedToken) {
-  //     saveTokens(refreshedToken);
-  //   }
-  // }
-
-  if (validBearerToken) {
-    console.info("Existing bearer token found and is valid.");
-    return storedToken;
+  if (!validBearerToken) {
+    const newToken = await startOauth();
+    return saveTokens(newToken);
   }
 
-  console.info("No valid bearer token found. Starting OAuth flow.");
-  const newToken = await startOauth();
-
-  if (!newToken) {
-    throw new Error("Could not get valid credentials");
-  }
-  return saveTokens(newToken);
+  console.info("Using existing bearer token");
+  return storedToken
 }
 
 export { getValidCredentials };
