@@ -98,8 +98,9 @@ async function exchangeCodeForIdAndAuthToken(code: string): Promise<IdTokenRespo
 // return response.data;
 // }
 
-async function getElawayToken(accessToken: string, idToken: string): Promise<ElawayTokenResponse | null> {
+async function getElawayToken(accessToken: string, idToken: string): Promise<ElawayTokenResponse> {
   try {
+    console.info("Requesting Elaway token with access token and ID token.");
     const response = await axios.post(ampecoApiUrl, {
       token: JSON.stringify({
         accessToken: accessToken,
@@ -119,12 +120,17 @@ async function getElawayToken(accessToken: string, idToken: string): Promise<Ela
       }
     });
 
-    saveTokens(response.data);
+    if (response.status !== 200) {
+      console.error("Error during Elaway token request:", response.data);
+      throw new Error(`Failed to get Elaway token: ${response.statusText}`);
+    }
 
+    console.info("Successfully obtained Elaway token.");
     return response.data;
   } catch (error) {
-    console.error(error.message);
-    return null;
+    console.error("Error in getElawayToken:", error.message);
+    console.error("You likely have the wrong ELAWAY_CLIENT_ID or ELAWAY_CLIENT_SECRET");
+    throw error;
   }
 }
 
@@ -153,7 +159,7 @@ function loadTokens(): StoredElawayToken | null {
   return null;
 }
 
-async function startOauth(): Promise<ElawayTokenResponse | null> {
+async function startOauth(): Promise<ElawayTokenResponse> {
   let tokenResponse: ElawayTokenResponse | null = null;
   let accessIdResponse: null | IdTokenResponse = null;
   const authUrl = `${elawayAuthorizationUrl}?response_type=code&client_id=${encodeURIComponent(config.clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(oauthScope)}&state=${encodeURIComponent(state)}`;
@@ -194,10 +200,13 @@ async function startOauth(): Promise<ElawayTokenResponse | null> {
   } finally {
     await browser.close();
   }
-  return tokenResponse
+  if (!tokenResponse) {
+    throw new Error("Failed to obtain token response");
+  }
+  return tokenResponse;
 }
 
-async function getValidCredentials(): Promise<StoredElawayToken | null> {
+async function getValidCredentials(): Promise<StoredElawayToken> {
   const storedToken = loadTokens();
 
   const validBearerToken = storedToken && storedToken.expires_at > Date.now();
@@ -215,19 +224,18 @@ async function getValidCredentials(): Promise<StoredElawayToken | null> {
   //   }
   // }
 
-  if (!validBearerToken) {
-    console.info("No existing bearer token found. Attempting to get new token.");
-    const newToken = await startOauth();
-
-    if (!newToken) {
-      throw new Error("Could not get valid credentials");
-    }
-    return loadTokens();
+  if (validBearerToken) {
+    console.info("Existing bearer token found and is valid.");
+    return storedToken;
   }
 
-  console.info("Using stored bearer token");
+  console.info("No valid bearer token found. Starting OAuth flow.");
+  const newToken = await startOauth();
 
-  return storedToken;
+  if (!newToken) {
+    throw new Error("Could not get valid credentials");
+  }
+  return saveTokens(newToken);
 }
 
 export { getValidCredentials };
