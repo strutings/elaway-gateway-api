@@ -15,11 +15,5 @@
   "formatter": {
     "enabled": true,
     "indentStyle": "space"
-  },
-  "files": {
-    "ignore": [
-      "node_modules/**",
-      "dist/**"
-    ]
   }
 }

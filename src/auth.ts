@@ -101,7 +101,7 @@ async function exchangeCodeForIdAndAuthToken(code: string): Promise<IdTokenRespo
 // return response.data;
 // }
 
-async function getBearerToken(accessToken: string, idToken: string): Promise<ElawayTokenResponse> {
+async function getElawayToken(accessToken: string, idToken: string): Promise<ElawayTokenResponse> {
   try {
     console.info("Requesting Elaway token with access token and ID token.");
     const response = await axios.post(ampecoApiUrl, {
@@ -128,11 +128,11 @@ async function getBearerToken(accessToken: string, idToken: string): Promise<Ela
       throw new Error(`Failed to get Elaway token: ${response.statusText}`);
     }
 
-    console.info("Successfully obtained bearer token.");
+    console.info("Successfully obtained Elaway token.");
     return response.data;
   } catch (error) {
     console.error("Error in getElawayToken:", error.message);
-    console.error("You likely have the wrong ELAWAY_CLIENT_ID and/or ELAWAY_CLIENT_SECRET");
+    console.error("You likely have the wrong ELAWAY_CLIENT_ID or ELAWAY_CLIENT_SECRET");
     throw error;
   }
 }
@@ -198,7 +198,7 @@ async function startOauth(): Promise<ElawayTokenResponse> {
 
       accessIdResponse = await exchangeCodeForIdAndAuthToken(code);
 
-      tokenResponse = await getBearerToken(accessIdResponse.access_token, accessIdResponse.id_token);
+      tokenResponse = await getElawayToken(accessIdResponse.access_token, accessIdResponse.id_token);
     }
   } catch (error) {
     console.error(error.message);
