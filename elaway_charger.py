@@ -86,6 +86,3 @@ try:
 except KeyboardInterrupt:
     client.loop_stop()
     client.disconnect()
-#
-#
-#### Notes:
