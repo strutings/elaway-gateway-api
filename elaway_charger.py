@@ -1,6 +1,6 @@
 #################################################################
 # Dirty script to fetch current charging price and add          #
-# start and stop buttons i Home Assistant                       #
+# start and stop buttons in Home Assistant                       #
 #                                                               #
 #    strutings@https://github.com/strutings/elaway-gateway-api/ #
 #                                                               #
