@@ -1,6 +1,9 @@
 #################################################################
-# Dirty script to fetch current charging price and add          #
-# start and stop buttons i Home Assistant                       #
+# Dirty script to fetch current charging price, session energy, #
+# session power, fixed fee, session total NOK, time started,    #
+# tariff and start/stop buttons for Home Assistant              #
+#                                                               #
+#   Run in loop ex; 'python3 elaway_charger.py &'               #
 #                                                               #
 #    strutings@https://github.com/strutings/elaway-gateway-api/ #
 #                                                               #
@@ -13,7 +16,7 @@ import time
 
 #@pyscript_compile
 # MQTT Configuration
-MQTT_BROKER = "10.0.0.186"
+MQTT_BROKER = ""
 MQTT_PORT = 1883
 MQTT_USER = "" 
 MQTT_PASSWORD = "" 
@@ -31,9 +34,9 @@ MQTT_TOPIC_BINARY_SENSOR_STATUS = "homeassistant/binary_sensor/charger/available
 
 
 # Charger API
-CHARGER_API_URL = "http://10.0.0.186:4000/charger"
-CHARGER_START_URL = "http://10.0.0.186:4000/charger/start"
-CHARGER_STOP_URL = "http://10.0.0.186:4000/charger/stop"
+CHARGER_API_URL = "http://URL:PORT/charger"
+CHARGER_START_URL = "http://URL:PORT/charger/start"
+CHARGER_STOP_URL = "http://URL:PORT/charger/stop"
 
 # MQTT Client Setup
 client = mqtt.Client()
@@ -57,6 +60,7 @@ client.on_connect = on_connect
 client.on_message = on_message
 client.connect(MQTT_BROKER, MQTT_PORT, 60)
 
+
 # Home Assistant MQTT Discovery
 def publish_discovery():
     sensor_config = {
@@ -74,7 +78,7 @@ def publish_discovery():
     sessionenergy_config = {
         "name": "Elaway Current session energy",
         "state_topic": f"{MQTT_TOPIC_SESSIONENERGY}/state",
-        "unit_of_measurement": "Wh",
+        "unit_of_measurement": "kWh",
         "device_class": "energy_storage"
     }
     sessionpower_config = {
@@ -104,9 +108,11 @@ def publish_discovery():
         "device_class": "energy"
     }
     available_config = {
-        "name": "Elaway Charger Status",
+        "name": "Elaway EV Charger Status",
         "state_topic": f"{MQTT_TOPIC_BINARY_SENSOR_STATUS}/state",
-        "device_class": "connectivity"
+        "device_class": "connectivity",
+        "payload_on": "1",
+        "payload_off": "0"
     }
 
     client.publish(f"homeassistant/sensor/charger/config", json.dumps(sensor_config), retain=True)
@@ -152,7 +158,7 @@ def fetch_and_publish():
     response = requests.get(CHARGER_API_URL)
     data = response.json()
     sessionenergy = data['data']['evses'][0]['session']['energy']
-    client.publish(f"{MQTT_TOPIC_SESSIONENERGY}/state", sessionenergy)
+    client.publish(f"{MQTT_TOPIC_SESSIONENERGY}/state", sessionenergy / 1000)
   except KeyError:
     client.publish(f"{MQTT_TOPIC_SESSIONENERGY}/state", "0")
 
@@ -198,15 +204,14 @@ def fetch_and_publish():
     data = response.json()
     status = data['data']['status']
     if status == 'available':
-      payload = 'online'
+      payload = '1'
     else:
-      payload = 'offline'
+      payload = '0'
     client.publish(f"{MQTT_TOPIC_BINARY_SENSOR_STATUS}/state", payload)
   except requests.exceptions.RequestException as e:
     return None
 
 
-#    if data.get('status') == 'available':
 
 
 publish_discovery()
