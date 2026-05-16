@@ -1,6 +1,7 @@
 {
   "domain": "elaway_charger",
   "name": "Elaway EV Charger",
+  "config_flow": true,
   "codeowner": ["@strutings"],
   "documentation": "local pulling",
   "dependencies": ["mqtt"],
