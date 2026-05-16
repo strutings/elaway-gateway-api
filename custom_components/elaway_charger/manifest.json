@@ -1,0 +1,11 @@
+{
+  "domain": "elaway_charger",
+  "name": "Elaway EV Charger",
+  "codeowners": ["@strutings"],
+  "config_flow": false,
+  "documentation": "https://github.com/strutings/elaway-gateway-api",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/strutings/elaway-gateway-api/issues",
+  "requirements": [],
+  "version": "1.0.0"
+}
