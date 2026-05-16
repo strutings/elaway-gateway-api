@@ -20,7 +20,9 @@ The recommended way would be to use docker. Copy the docker-compose.yml.example 
 
 For legal reasons the client secrets are not provided here, but can be aquired using and iPhone/Android device with the Elaway app, in combination with [mitmproxy](https://mitmproxy.org/).
 
+Add to configuration.yaml
+
 elaway_charger:
-  - charger_api_url: "http://192.168.1.100:8080/charger"
-    charger_start_url: "http://192.168.1.100:8080/charger/start"
-    charger_stop_url: "http://192.168.1.100:8080/charger/stop"
+  charger_api_url: "http://192.168.1.100:8080/charger"
+  charger_start_url: "http://192.168.1.100:8080/charger/start"
+  charger_stop_url: "http://192.168.1.100:8080/charger/stop"
