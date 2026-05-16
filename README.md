@@ -22,7 +22,11 @@ For legal reasons the client secrets are not provided here, but can be aquired u
 
 Add to configuration.yaml
 
-elaway_charger:
+## elaway_charger:
+
   charger_api_url: "http://192.168.1.100:8080/charger"
+  
   charger_start_url: "http://192.168.1.100:8080/charger/start"
+  
   charger_stop_url: "http://192.168.1.100:8080/charger/stop"
+  
