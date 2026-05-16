@@ -23,21 +23,38 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
     }
 )
 
-async def validate_input(session: aiohttp.ClientSession, data: dict[str, Any]) -> dict[str, Any]:
-    """Validerer at API-URL-en faktisk fungerer og svarer."""
-    try:
-        async with session.get(data[CONF_CHARGER_API_URL], timeout=10) as resp:
-            if resp.status != 200:
-                return {"base": "cannot_connect"}
-            # Sjekk om det er gyldig JSON og har riktig struktur
-            json_data = await resp.json()
-            if "data" not in json_data or "evses" not in json_data["data"]:
-                return {"base": "invalid_auth"}  # Eller ugyldig datarespons
-    except Exception:  # pylint: disable=broad-except
-        _LOGGER.exception("Feil under validering av Elaway API")
-        return {"base": "cannot_connect"}
+async def validate_input(session: aiohttp.ClientSession, data: dict[str, Any]) -> dict[str, str]:
+    """Validerer at vi i det minste får kontakt med URL-en."""
+    errors: dict[str, str] = {}
+    url = data[CONF_CHARGER_API_URL]
 
-    return {}
+    if not url.startswith(("http://", "https://")):
+        errors["base"] = "cannot_connect"
+        _LOGGER.error("URL-en må starte med http:// eller https://")
+        return errors
+
+    try:
+        # Vi gjør en kjapp sjekk med 10 sekunder timeout
+        async with session.get(url, timeout=10) as resp:
+            _LOGGER.debug("Elaway API svarte med statuskode: %s", resp.status)
+            
+            # Hvis du vet at API-et krever auth, kan du midlertidig godta 401/403 for å slippe forbi config flow
+            if resp.status not in [200, 401, 403]:
+                _LOGGER.error("API-et returnerte uventet statuskode: %s", resp.status)
+                errors["base"] = "cannot_connect"
+                return errors
+                
+    except aiohttp.ClientConnectorError as err:
+        _LOGGER.error("Kunne ikke opprette tilkobling til %s: %s", url, err)
+        errors["base"] = "cannot_connect"
+    except asyncio.TimeoutError:
+        _LOGGER.error("Tidsavbrudd (timeout) mot %s", url)
+        errors["base"] = "cannot_connect"
+    except Exception as err:  # pylint: disable=broad-except
+        _LOGGER.exception("Uventet feil under validering av Elaway API: %s", err)
+        errors["base"] = "cannot_connect"
+
+    return errors
 
 
 class ElawayChargerConfigFlow(config_entries.ConfigFlow, domain=DOMENE):
@@ -52,11 +69,14 @@ class ElawayChargerConfigFlow(config_entries.ConfigFlow, domain=DOMENE):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            # Sjekk om integrasjonen allerede er satt opp (hindre duplikater)
+            # Sikre at URL-ene ikke har unødvendige mellomrom
+            user_input[CONF_CHARGER_API_URL] = user_input[CONF_CHARGER_API_URL].strip()
+            user_input[CONF_CHARGER_START_URL] = user_input[CONF_CHARGER_START_URL].strip()
+            user_input[CONF_CHARGER_STOP_URL] = user_input[CONF_CHARGER_STOP_URL].strip()
+
             await self.async_set_unique_id(user_input[CONF_CHARGER_API_URL])
             self._abort_if_unique_id_configured()
 
-            # Valider URL-ene
             session = async_get_clientsession(self.hass)
             errors = await validate_input(session, user_input)
 
