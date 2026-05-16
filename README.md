@@ -24,9 +24,6 @@ Add to configuration.yaml
 
 ## elaway_charger:
 
-  charger_api_url: "http://192.168.1.100:8080/charger"
-  
-  charger_start_url: "http://192.168.1.100:8080/charger/start"
-  
-  charger_stop_url: "http://192.168.1.100:8080/charger/stop"
+  Download rep. in hacks and restart HA. 
+  Install integration 
   
