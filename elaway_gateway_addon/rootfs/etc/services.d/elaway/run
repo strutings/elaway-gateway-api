@@ -1,0 +1,14 @@
+#!/usr/bin/with-contenv bashio
+
+echo "Henter konfigurasjon fra Home Assistant..."
+
+export ELAWAY_USER=$(bashio::config 'elaway_user')
+export ELAWAY_PASSWORD=$(bashio::config 'elaway_password')
+export ELAWAY_CLIENT_ID=$(bashio::config 'elaway_client_id')
+export ELAWAY_CLIENT_SECRET=$(bashio::config 'elaway_client_secret')
+export CLIENT_ID=$(bashio::config 'client_id')
+export PORT=$(bashio::config 'port')
+
+echo "Starter Elaway Gateway API med Google Chrome..."
+cd /app
+exec node dist/src/main.js

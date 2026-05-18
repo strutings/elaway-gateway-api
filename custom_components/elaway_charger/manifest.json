@@ -1,0 +1,10 @@
+{
+  "domain": "elaway_charger",
+  "name": "Elaway EV Charger",
+  "codeowner": ["@strutings"],
+  "documentation": "",
+  "dependencies": [],
+  "requirements": [],
+  "version": "1.2.1",
+  "config_flow": true
+}

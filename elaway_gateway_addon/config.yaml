@@ -1,0 +1,24 @@
+name: "Elaway Gateway API"
+description: "Gateway API for Elaway levert av jvik"
+version: "1.0.0"
+slug: "elaway_gateway_api"
+host_network: true
+arch:
+  - aarch64
+  - amd64
+  - armv7
+init: false
+options:
+  elaway_user: ""
+  elaway_password: ""
+  elaway_client_id: ""
+  elaway_client_secret: ""
+  client_id: ""
+  port: 3000
+schema:
+  elaway_user: str
+  elaway_password: password
+  elaway_client_id: str
+  elaway_client_secret: password
+  client_id: str
+  port: int

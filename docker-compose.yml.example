@@ -1,0 +1,14 @@
+version: "3.8"
+
+services:
+  app:
+    image: jvik/elaway-gateway-api:latest
+    environment:
+      - ELAWAY_USER=
+      - ELAWAY_PASSWORD=
+      - ELAWAY_CLIENT_ID=
+      - ELAWAY_CLIENT_SECRET=
+      - CLIENT_ID=
+      - PORT=3000
+    ports:
+      - "3000:3000"
