@@ -1,0 +1,7 @@
+{
+  "name": "Elaway EV Charger V2",
+  "content_in_root": false,
+  "config_flow": true,
+  "domains": ["elaway_charger_v2"],
+  "iot_class": "cloud_polling"
+}
