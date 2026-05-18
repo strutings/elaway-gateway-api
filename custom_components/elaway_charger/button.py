@@ -1,42 +1,46 @@
-"""Støtte for Elaway start og stopp knapper."""
+"""Støtte for Elaway knapper (handlinger)."""
 from __future__ import annotations
 
 import logging
 import aiohttp
-from homeassistant.components.button import ButtonEntity
+from homeassistant.components.button import ButtonEntity, ButtonDeviceClass
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.entity import DeviceInfo
 
-from .const import CONF_CHARGER_START_URL, CONF_CHARGER_STOP_URL, DOMENE
+from .const import DOMENE
 
 _LOGGER = logging.getLogger(__name__)
 
-
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities):
-    """Sett opp knappene."""
-    session = async_get_clientsession(hass)
+    """Sett opp knapper basert på Elaway API-struktur."""
+    # Knapper trenger API-klienten for å sende POST-kall, ikke koordinatoren
+    api = hass.data[DOMENE][entry.entry_id]["api"]
+
+    buttons = [
+        ElawayActionButton(
+            api, entry, "start_charging", "Start Charging", "mdi:play-circle", "remote-action/start"
+        ),
+        ElawayActionButton(
+            api, entry, "stop_charging", "Stop Charging", "mdi:stop-circle", "remote-action/stop"
+        ),
+    ]
     
-    start_url = entry.data[CONF_CHARGER_START_URL]
-    stop_url = entry.data[CONF_CHARGER_STOP_URL]
-
-    async_add_entities([
-        ElawayButton(session, entry, "start", "Start Charging", start_url, "mdi:play"),
-        ElawayButton(session, entry, "stop", "Stop Charging", stop_url, "mdi:stop"),
-    ])
+    async_add_entities(buttons)
 
 
-class ElawayButton(ButtonEntity):
-    """Knapp for å sende kommandoer over HTTP."""
+class ElawayActionButton(ButtonEntity):
+    """En knapp som trigger en handling mot Elaway API."""
 
-    def __init__(self, session: aiohttp.ClientSession, entry, key, name, url, icon):
+    def __init__(self, api, entry, key, name, icon, api_endpoint):
         """Initialiser knappen."""
-        self.session = session
-        self.url = url
+        self._api = api
+        self._entry = entry
+        self._api_endpoint = api_endpoint
         self._attr_name = name
         self._attr_icon = icon
-        self._attr_unique_id = f"{entry.entry_id}_button_{key}"
+        self._attr_unique_id = f"{entry.entry_id}_{key}"
+        
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMENE, "elaway_charger_device")},
             name="Elaway EV Charger",
@@ -45,13 +49,28 @@ class ElawayButton(ButtonEntity):
         )
 
     async def async_press(self) -> None:
-        """Sende HTTP POST når knappen trykkes i UI."""
-        _LOGGER.info("Sender kommando til: %s", self.url)
+        """Kjøres når brukeren trykker på knappen i Home Assistant."""
+        _LOGGER.info(f"Trigger handling: {self._attr_name}")
+        
         try:
-            async with self.session.post(self.url) as response:
-                if response.status == 200:
-                    _LOGGER.info("Kommando utført suksessfullt (%s)", self.name)
-                else:
-                    _LOGGER.error("Feil ved utføring av kommando mot %s: %s", self.url, response.status)
+            # 1. Hent gyldig token
+            token = await self._api.async_get_valid_credentials()
+            
+            # 2. Send kommandoen direkte til Elaway/Ampeco
+            # (Bytt ut URL-en under med det nøyaktige endepunktet Ampeco bruker for kommandoer)
+            url = f"{self._api.ampeco_api_url}/v1/user/chargers/{self._api_endpoint}"
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json"
+            }
+            
+            async with aiohttp.ClientSession() as session:
+                # Ampeco krever ofte en tom JSON-body eller ID i post-kallet
+                async with session.post(url, headers=headers, json={}) as response:
+                    if response.status in [200, 201, 204]:
+                        _LOGGER.info(f"Handling '{self._attr_name}' utført med suksess!")
+                    else:
+                        _LOGGER.error(f"Klarte ikke å utføre handling. Status: {response.status}")
+                        
         except Exception as err:
-            _LOGGER.error("Krasj ved sending av kommando til %s: %s", self.url, err)
+            _LOGGER.error(f"Feil under trykk på knapp {self._attr_name}: {err}")

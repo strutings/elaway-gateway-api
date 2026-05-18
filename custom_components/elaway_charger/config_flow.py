@@ -1,37 +1,52 @@
-"""Config flow for Elaway EV Charger."""
-from __future__ import annotations
-
-from typing import Any
 import voluptuous as vol
-
 from homeassistant import config_entries
-from homeassistant.data_entry_flow import FlowResult
+from homeassistant.core import callback
+from .api import ElawayAPI
 
-from .const import CONF_CHARGER_API_URL, CONF_CHARGER_START_URL, CONF_CHARGER_STOP_URL, DOMENE
+DOMAIN = "elaway_charger"
 
-
-class ElawayChargerConfigFlow(config_entries.ConfigFlow, domain=DOMENE):
-    """Håndterer config flow."""
-
+class ElawayConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+    """Håndterer oppsett via Home Assistant UI."""
+    
     VERSION = 1
 
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Første steg i oppsettet."""
-        if user_input is not None:
-            return self.async_create_entry(
-                title="Elaway EV Charger",
-                data=user_input,
-            )
+    async def async_step_user(self, user_input=None):
+        """Kjøres når brukeren legger til integrasjonen manuelt."""
+        errors = {}
 
-        return self.async_show_form(
-            step_id="user",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_CHARGER_API_URL, default="http://10.0.0.186:4000/charger"): str,
-                    vol.Required(CONF_CHARGER_START_URL, default="http://10.0.0.186:4000/charger/start"): str,
-                    vol.Required(CONF_CHARGER_STOP_URL, default="http://10.0.0.186:4000/charger/stop"): str,
-                }
+        if user_input is not None:
+            # Test om innloggingen fungerer før vi lagrer!
+            api = ElawayAPI(
+                username=user_input["elaway_user"],
+                password=user_input["elaway_password"],
+                client_id=user_input["client_id"],
+                elaway_client_id=user_input["elaway_client_id"],
+                elaway_client_secret=user_input["elaway_client_secret"],
+                ampeco_api_url=user_input["ampeco_api_url"]
             )
+            
+            try:
+                await api.async_get_valid_credentials()
+                # Suksess! Opprett integrasjonen i HA
+                return self.async_create_entry(
+                    title=f"Elaway ({user_input['elaway_user']})", 
+                    data=user_input
+                )
+            except Exception:
+                errors["base"] = "cannot_connect"
+
+        # Feltene brukeren ser på skjermen
+        data_schema = vol.Schema({
+            vol.Required("elaway_user"): str,
+            vol.Required("elaway_password"): str,
+            vol.Required("client_id"): str,
+            vol.Required("elaway_client_id"): str,
+            vol.Required("elaway_client_secret"): str,
+            vol.Required("ampeco_api_url", default="https://api.ampeco.com"): str, # Juster default hvis nødvendig
+        })
+
+        return self.show_form(
+            step_id="user", 
+            data_schema=data_schema, 
+            errors=errors
         )

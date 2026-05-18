@@ -1,18 +1,72 @@
 """Støtte for Elaway sensorer."""
 from __future__ import annotations
 
+from datetime import timedelta
+import logging
+import aiohttp
+
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.helpers.update_coordinator import CoordinatorEntity, DataUpdateCoordinator, UpdateFailed
 
 from .const import DOMENE
 
+_LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities):
     """Sett opp sensorer basert på Elaway API-struktur."""
-    coordinator = hass.data[DOMENE][entry.entry_id]
+    # Hent koordinatoren fra den sentrale lagringen i __init__.py
+    coordinator = hass.data[DOMENE][entry.entry_id]["coordinator"]
+
+    
+    # 1. Hent ut API-klienten vi lagret i __init__.py
+    api = hass.data[DOMENE][entry.entry_id]
+    
+    # 2. Definer oppdateringsfunksjonen som erstatter Docker-kallene
+    async def _async_update_data():
+        try:
+            # Hent gyldig Bearer Token direkte fra vår nye asynkrone Python-klient
+            token = await api.async_get_valid_credentials()
+            
+            # Dette er den nøyaktige URL-en som Node-appen din brukte i bakgrunnen
+            url = f"{api.ampeco_api_url}/v1/user/chargers"
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+                "User-Agent": "insomnia/10.0.0"
+            }
+            
+            # Hent rådataene direkte fra Elaway/Ampeco
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, headers=headers) as response:
+                    if response.status != 200:
+                        raise UpdateFailed(f"Feil status fra Elaway API: {response.status}")
+                    
+                    raw_data = await response.json()
+                    
+                    # Siden sensorene dine forventer strukturen d['data'][...],
+                    # pakker vi dataene inn slik at lambda-funksjonene dine fungerer uendret.
+                    # Hvis Ampeco-responsen din returnerer en liste, henter vi det første elementet.
+                    if isinstance(raw_data, list):
+                        return {"data": raw_data[0]}
+                    return {"data": raw_data}
+                    
+        except Exception as err:
+            raise UpdateFailed(f"Klarte ikke å oppdatere Elaway-data: {err}")
+
+    # 3. Opprett koordinatoren lokalt her
+    coordinator = DataUpdateCoordinator(
+        hass,
+        _LOGGER,
+        name="Elaway Sensor Coordinator",
+        update_method=_async_update_data,
+        update_interval=timedelta(seconds=30), # Juster oppdateringsfrekvensen her
+    )
+
+    # Hent første datapunkt umiddelbart under oppstart av HA
+    await coordinator.async_config_entry_first_refresh()
     
     sensors = [
         # --- Eksisterende sensorer ---
@@ -99,8 +153,8 @@ class ElawaySensor(CoordinatorEntity, SensorEntity):
         )
 
     @property
-    def state(self):
-        """Returner nåværende verdi med feilhåndtering."""
+    def native_value(self):
+        """Returner nåværende verdi til Home Assistant med feilhåndtering."""
         if not self.coordinator.data:
             return None
         try:

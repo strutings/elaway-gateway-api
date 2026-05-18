@@ -1,66 +1,95 @@
-"""Elaway EV Charger integrasjon via HTTP API."""
+"""Elaway EV Charger integrasjon."""
 from __future__ import annotations
 
-import datetime
+from datetime import timedelta
 import logging
-import async_timeout
 import aiohttp
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import CONF_CHARGER_API_URL, DOMENE
+from .api import ElawayAPI
+from .const import DOMENE
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS = ["sensor", "binary_sensor", "button"]
+# Definer hvilke plattformer integrasjonen skal laste inn
+PLATFORMS: list[str] = ["sensor", "binary_sensor", "button"]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Sette opp integrasjonen fra en config entry."""
-    session = async_get_clientsession(hass)
-    
-    coordinator = ElawayDataUpdateCoordinator(hass, session, entry.data[CONF_CHARGER_API_URL])
+    """Setter opp Elaway fra en config entry (UI)."""
+    config = entry.data
+
+    # 1. Opprett API-instansen med lagret påloggingsdata fra config_flow
+    api = ElawayAPI(
+        username=config["elaway_user"],
+        password=config["elaway_password"],
+        client_id=config["client_id"],
+        elaway_client_id=config["elaway_client_id"],
+        elaway_client_secret=config["elaway_client_secret"],
+        ampeco_api_url=config["ampeco_api_url"]
+    )
+
+    # 2. Definer oppdateringsfunksjonen for DataUpdateCoordinator sentralt
+    async def _async_update_data():
+        try:
+            # Hent gyldig Bearer Token direkte fra vår asynkrone Python-klient
+            token = await api.async_get_valid_credentials()
+            
+            url = f"{api.ampeco_api_url}/v1/user/chargers"
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+                "User-Agent": "insomnia/10.0.0"
+            }
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, headers=headers) as response:
+                    if response.status != 200:
+                        raise UpdateFailed(f"Feil status fra Elaway API: {response.status}")
+                    
+                    raw_data = await response.json()
+                    
+                    # Pakk dataene inn i {"data": ...} så sensorenes lambdaer fungerer uendret
+                    if isinstance(raw_data, list):
+                        if not raw_data:
+                            raise UpdateFailed("Ingen ladestasjoner funnet på denne kontoen.")
+                        return {"data": raw_data[0]}
+                    return {"data": raw_data}
+                    
+        except Exception as err:
+            raise UpdateFailed(f"Klarte ikke å oppdatere data fra Elaway: {err}")
+
+    # 3. Opprett koordinatoren sentralt
+    coordinator = DataUpdateCoordinator(
+        hass,
+        _LOGGER,
+        name="Elaway Data Coordinator",
+        update_method=_async_update_data,
+        update_interval=timedelta(seconds=30),
+    )
+
+    # Hent første datapunkt umiddelbart under oppstart
     await coordinator.async_config_entry_first_refresh()
 
+    # 4. Lagre både API og Koordinator i hass.data så alle plattformer har tilgang
     hass.data.setdefault(DOMENE, {})
-    hass.data[DOMENE][entry.entry_id] = coordinator
+    hass.data[DOMENE][entry.entry_id] = {
+        "api": api,
+        "coordinator": coordinator
+    }
 
+    # 5. Start opp sensor.py, binary_sensor.py og button.py
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
     return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Fjerne integrasjonen."""
+    """Fjerner integrasjonen og stopper alle plattformer hvis brukeren sletter den."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
         hass.data[DOMENE].pop(entry.entry_id)
     return unload_ok
-
-
-class ElawayDataUpdateCoordinator(DataUpdateCoordinator):
-    """Klasse for å håndtere effektiv henting av API-data."""
-
-    def __init__(self, hass: HomeAssistant, session: aiohttp.ClientSession, url: str):
-        """Initialiser coordinator."""
-        self.url = url
-        self.session = session
-        super().__init__(
-            hass,
-            _LOGGER,
-            name="Elaway Charger API",
-            update_interval=datetime.timedelta(seconds=60),
-        )
-
-    async def _async_update_data(self):
-        """Hent data fra API-et."""
-        try:
-            async with async_timeout.timeout(10):
-                async with self.session.get(self.url) as response:
-                    if response.status != 200:
-                        raise UpdateFailed(f"Ugyldig statuskode fra API: {response.status}")
-                    return await response.json()
-        except Exception as err:
-            raise UpdateFailed(f"Kunne ikke kontakte Elaway API: {err}") from err
